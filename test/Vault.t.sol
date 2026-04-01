@@ -19,18 +19,18 @@ contract VaultTest is Test {
 
     function test_User1CanDeposit() public {
         vm.prank(user1);
-        vault.deposit{value:1 ether}();
+        deposit{value:1 ether}();
 
         assertEq(vault.balances(user1),1 ether);
     }
 
     function test_MultipleUsers() public {
         vm.startPrank(user1);
-        vault.deposit{value:1 ether}();
+        deposit{value:1 ether}();
         vm.stopPrank();
 
         vm.prank(user2);
-        vault.deposit{value:2 ether}();
+        deposit{value:2 ether}();
 
         assertEq(vault.balances(user1),1 ether);
         assertEq(vault.balances(user2),2 ether);
@@ -45,7 +45,7 @@ contract VaultTest is Test {
     function test_OwnerEmergencyWithdraw() public {
         address owner = vault.owner();
 
-        vm.prank(user1);vault.deposit{value:1 ether}();
+        vm.prank(user1);deposit{value:1 ether}();
 
         uint256 initialBalance = address(this).balance;
 
@@ -70,7 +70,7 @@ contract VaultTimeTest is Test {
 
     function test_WithdrawAfterLockPeriod() public {
         vm.prank(user);
-        vault.deposit{value:1 ether}();
+        deposit{value:1 ether}();
 
         uint256 lockTime = vault.lockTime(user);
         assertEq(lockTime , 1000 + 7 days);
@@ -85,24 +85,24 @@ contract VaultTimeTest is Test {
 
     function test_CannotWithdrawBeforeLockPeriod() public {
         vm.prank(user);
-        vault.deposit{value:1 ether}();
-        wm.warp(1000+6 days);
-        wm.prank(user);
-        wm.expectRevert("Locked");
+        deposit{value:1 ether}();
+        vm.warp(1000 + 6 days);
+        vm.prank(user);
+        vm.expectRevert("Locked");
         vault.withdraw(1 ether);
     }
 
     function test_WithdrawAtDifferentBlocks() public {
 
         vm.prank(user);
-        vault.deposit{value : 1 ether};
+        deposit{value : 1 ether}();
 
         vm.roll(100);
         vm.prank(user);
         vm.expectRevert("Locked");
         vault.withdraw(1 ether);
 
-        vm.warp(1000+8days);
+        vm.warp(1000 + 8 days);
         vm.roll(1000);
 
         vm.prank(user);
@@ -126,21 +126,21 @@ contract VaultEventTest is Test{
         vm.prank(user);
 
         vm.expectEmit(true,false,false,true);
-        emit Deposited(user:1 ether);
+        emit Deposited(user , 1 ether);
 
-        vault.deposit{value: 1 ether}();
+        deposit{value: 1 ether}();
     }
 
     function test_WithdrawEmitsEvent() public {
         vm.prank(user);
-        vault.deposit{value:1 ether}();
+        deposit{value:1 ether}();
 
-        vm.warp(1000+8 days);
+        vm.warp(1000 + 8 days);
 
         vm.prank(user);
 
         vm.expectEmit(true , false , false , true);
-        emit Withdrawn(user,0.5 ether);
+        emit vault.Withdrawn(user,0.5 ether);
 
         vault.withdraw(0.5 ether);
     }
@@ -162,7 +162,7 @@ contract VaultSnapshotTest is Test {
         uint256 snapshotId = vm.snapshot();
 
         vm.prank(user);
-        vault.deposit{value : 1 ether}();
+        deposit{value : 1 ether}();
         assertEq(address(vault).balance, 1 ether);
 
         vm.revertTo(snapshotId);
@@ -171,5 +171,24 @@ contract VaultSnapshotTest is Test {
         assertEq(vault.balances(user),0);
     }
 
-    function test_MultipleScenarios()public{}
+    function test_MultipleScenarios()public{
+        uint256 scenario1 = vm.snapshot();
+
+        vm.prank(user);
+        deposit{value: 1 ether}();
+        vm.warp(1000 + 8 days);
+        vm.prank(user);
+        vault.withdraw(1 ether);
+
+        assertEq(vault.balances(user),0);
+
+        vm.revertTo(scenario1);
+
+        vm.prank(user);
+        deposit{value : 1 ether}();
+        vm.warp(1000 + 3 days);
+        vm.prank(user);
+        vm.expectRevert("Locked");
+        vault.withdraw(1 ether);
+    }
 }
